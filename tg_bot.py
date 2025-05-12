@@ -1,6 +1,7 @@
 import os
 import logging
 import random
+import re
 
 from telegram.ext import (
     Updater,
@@ -12,6 +13,7 @@ from telegram.ext import (
 from telegram import Update, ForceReply, Bot, ReplyKeyboardMarkup
 from telegram_logs import TelegramLogsHandler
 from quiz_data import load_all_questions
+import redis
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +35,6 @@ def start(update: Update, context: CallbackContext) -> None:
     )
 
 
-
 def help_command(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
     update.message.reply_text('Help!')
@@ -41,15 +42,20 @@ def help_command(update: Update, context: CallbackContext) -> None:
 
 def handle_message(update: Update, context: CallbackContext) -> None:
     user_message = update.message.text
+    user_id = str(update.effective_user.id)
 
     if user_message == 'Новый вопрос':
         question = random.choice(list(questions.keys()))
-        context.user_data['current_question'] = question
+        # user_id = str(update.effective_user.id)
+        redis_conn.set(user_id, question)
         update.message.reply_text(question)
 
     elif user_message == 'Сдаться':
-        answer = questions.get(context.user_data.get('current_question'))
-        if answer:
+        # user_id = str(update.effective_user.id)
+        question = redis_conn.get(user_id)
+
+        if question:
+            answer = questions.get(question)
             update.message.reply_text(f'Правильный ответ: {answer}')
         else:
             update.message.reply_text('Сначала запросите вопрос!')
@@ -58,12 +64,36 @@ def handle_message(update: Update, context: CallbackContext) -> None:
         update.message.reply_text('Пока что счёт не ведётся :)')
 
     else:
-        update.message.reply_text('Я вас не понял. Нажмите кнопку.')
+        question = redis_conn.get(user_id)
+        if not question:
+            update.message.reply_text('Сначала запросите вопрос!')
+            return
+
+        correct_answer = questions.get(question)
+        user_answer = user_message.strip().lower()
+        correct_main_part = re.split(r'[.(]', correct_answer)[0].strip().lower()
+
+        if user_answer == correct_main_part:
+            update.message.reply_text('Правильно! Поздравляю! Для следующего вопроса нажми «Новый вопрос»')
+            redis_conn.delete(user_id)
+        else:
+            update.message.reply_text('Неправильно… Попробуешь ещё раз?')
+
+    # else:
+    #     update.message.reply_text('Я вас не понял. Нажмите кнопку.')
 
 
 if __name__ == "__main__":
-    questions = load_all_questions('/Users/egorsemin/Practice/Quiz_time/quiz-questions')
 
+    redis_conn = redis.StrictRedis(
+        host='redis-19137.c339.eu-west-3-1.ec2.redns.redis-cloud.com',
+        port=19137,
+        password=os.environ['REDIS_PASSWORD'],
+        decode_responses=True
+    )
+
+    questions = load_all_questions('/Users/egorsemin/Practice/Quiz_time/quiz-questions')
+    # print(questions)
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
