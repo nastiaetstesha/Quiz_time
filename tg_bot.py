@@ -94,8 +94,8 @@ def start(update: Update, context: CallbackContext) -> None:
 
 if __name__ == "__main__":
 
-    redis_host = os.environs["REDIS_HOST"]
-    path_to_questions = os.environs["PATH_TO_QUESTIONS"]
+    redis_host = os.environ["REDIS_HOST"]
+    path_to_questions = os.environ["PATH_TO_QUESTIONS"]
     tg_token = os.environ["TELEGRAM_BOT_TOKEN"]
     admin_chat_id = os.environ["TG_ADMIN_CHAT_ID"]
 
