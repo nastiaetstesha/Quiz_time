@@ -12,6 +12,7 @@ from telegram.ext import (
 )
 from telegram import Update, Bot, ReplyKeyboardMarkup
 from telegram_logs import TelegramLogsHandler
+from functools import partial
 from quiz_data import load_all_questions
 import redis
 from enum import Enum
@@ -24,7 +25,9 @@ class BotState(Enum):
 logger = logging.getLogger(__name__)
 
 
-def handle_new_question_request(update: Update, context: CallbackContext) -> BotState:
+def handle_new_question_request(
+        update: Update, context: CallbackContext, redis_conn, questions
+        ) -> BotState:
     user_id = str(update.effective_user.id)
     question = random.choice(list(questions.keys()))
     redis_conn.set(user_id, question)
@@ -32,7 +35,9 @@ def handle_new_question_request(update: Update, context: CallbackContext) -> Bot
     return BotState.WAITING_FOR_ANSWER
 
 
-def handle_solution_attempt(update: Update, context: CallbackContext):
+def handle_solution_attempt(
+        update: Update, context: CallbackContext, redis_conn, questions
+        ):
     user_id = str(update.effective_user.id)
     question = redis_conn.get(user_id)
 
@@ -60,7 +65,9 @@ def cancel(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 
-def handle_give_up(update: Update, context: CallbackContext):
+def handle_give_up(
+        update: Update, context: CallbackContext, redis_conn, questions
+        ):
     user_id = str(update.effective_user.id)
     question = redis_conn.get(user_id)
 
@@ -112,6 +119,22 @@ if __name__ == "__main__":
         level=logging.INFO
     )
 
+    new_question_handler = partial(
+        handle_new_question_request,
+        redis_conn=redis_conn,
+        questions=questions
+        )
+    solution_attempt_handler = partial(
+        handle_solution_attempt,
+        redis_conn=redis_conn,
+        questions=questions
+        )
+    give_up_handler = partial(
+        handle_give_up,
+        redis_conn=redis_conn,
+        questions=questions
+        )
+
     bot = Bot(tg_token)
 
     updater = Updater(tg_token)
@@ -121,13 +144,13 @@ if __name__ == "__main__":
 
     conv_handler = ConversationHandler(
         entry_points=[MessageHandler(
-            Filters.regex('^(Новый вопрос)$'), handle_new_question_request
+            Filters.regex('^(Новый вопрос)$'), new_question_handler
             )],
         states={
              BotState.WAITING_FOR_ANSWER: [
-                MessageHandler(Filters.regex('^(Сдаться)$'), handle_give_up),
+                MessageHandler(Filters.regex('^(Сдаться)$'), give_up_handler),
                 MessageHandler(
-                    Filters.text & ~Filters.command, handle_solution_attempt
+                    Filters.text & ~Filters.command, solution_attempt_handler
                     ),
                 ],
         },

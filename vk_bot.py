@@ -4,6 +4,7 @@ import logging
 import redis
 import vk_api
 import json
+from functools import partial
 
 from vk_api.longpoll import VkLongPoll, VkEventType
 from quiz_data import load_all_questions
@@ -35,7 +36,7 @@ def send_keyboard(vk, user_id, message):
         keyboard=json.dumps(keyboard, ensure_ascii=False))
 
 
-def handle_message(event, vk):
+def handle_message(event, vk, redis_conn, questions):
     user_id = str(event.user_id)
     text = event.text.strip()
 
@@ -123,6 +124,11 @@ if __name__ == "__main__":
     vk = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)
 
+    handler_new_message = partial(
+        handle_message,
+        redis_conn=redis_conn,
+        questions=questions
+        )
     for event in longpoll.listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-            handle_message(event, vk)
+            handler_new_message(event, vk)
