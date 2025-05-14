@@ -38,6 +38,8 @@ def send_keyboard(vk, user_id, message):
 
 def handle_message(event, vk, redis_conn, questions):
     user_id = str(event.user_id)
+    user_key = f"vk-{event.user_id}"
+
     text = event.text.strip()
 
     if text.lower() == "старт":
@@ -52,11 +54,11 @@ def handle_message(event, vk, redis_conn, questions):
 
     if text == "Новый вопрос":
         question = random.choice(list(questions.keys()))
-        redis_conn.set(user_id, question)
+        redis_conn.set(user_key, question)
         send_keyboard(vk, user_id, question)
 
     elif text == "Сдаться":
-        question = redis_conn.get(user_id)
+        question = redis_conn.get(user_key)
         if question:
             answer = questions.get(question)
             vk.messages.send(
@@ -65,7 +67,7 @@ def handle_message(event, vk, redis_conn, questions):
                 random_id=random.randint(1, 1e9)
                 )
         new_question = random.choice(list(questions.keys()))
-        redis_conn.set(user_id, new_question)
+        redis_conn.set(user_key, new_question)
         send_keyboard(vk, user_id, new_question)
 
     elif text == "Мой счет":

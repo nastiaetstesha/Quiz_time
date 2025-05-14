@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 def handle_new_question_request(
         update: Update, context: CallbackContext, redis_conn, questions
         ) -> BotState:
-    user_id = str(update.effective_user.id)
+    user_id = f"tg-{update.effective_user.id}"
     question = random.choice(list(questions.keys()))
     redis_conn.set(user_id, question)
     update.message.reply_text(question)
@@ -38,7 +38,7 @@ def handle_new_question_request(
 def handle_solution_attempt(
         update: Update, context: CallbackContext, redis_conn, questions
         ):
-    user_id = str(update.effective_user.id)
+    user_id = f"tg-{update.effective_user.id}"
     question = redis_conn.get(user_id)
 
     if not question:
@@ -68,7 +68,7 @@ def cancel(update: Update, context: CallbackContext) -> int:
 def handle_give_up(
         update: Update, context: CallbackContext, redis_conn, questions
         ):
-    user_id = str(update.effective_user.id)
+    user_id = f"tg-{update.effective_user.id}"
     question = redis_conn.get(user_id)
 
     if question:
